@@ -6,8 +6,8 @@ import {
   RenderPass,
   EffectPass,
   BlendFunction,
-  OverrideMaterialManager,
   ChromaticAberrationEffect,
+  BloomEffect,
   NoiseEffect,
   PredicationMode,
   SMAAEffect,
@@ -20,9 +20,6 @@ function usePostprocessing(reflectorPipeline = []) {
   const smaa = useLoader(SMAAImageLoader);
 
   const [composer] = useMemo(() => {
-    OverrideMaterialManager.workaroundEnabled = true;
-    const anisotropy = Math.min(gl.capabilities.getMaxAnisotropy(), 8);
-
     const composer = new EffectComposer(gl, {
       frameBufferType: THREE.HalfFloatType,
       multisampling: 0,
@@ -30,15 +27,18 @@ function usePostprocessing(reflectorPipeline = []) {
     const renderPass = new RenderPass(scene, camera);
 
     const CHROMATIC_ABERRATION = new ChromaticAberrationEffect({
-      offset: new THREE.Vector2(0.0005, 0.0005),
+      offset: new THREE.Vector2(0.001, 0.001),
     });
-
+    const BLOOM = new BloomEffect({
+      luminanceSmoothing: 0.3,
+      intensity: 0.5,
+    });
     const NOISE = new NoiseEffect({
       blendFunction: BlendFunction.COLOR_DODGE,
     });
     NOISE.blendMode.opacity.value = 0.03;
 
-    // ANTIALIAS
+    // INIT ANTIALIAS
     const SMAA = new SMAAEffect(...smaa);
     SMAA.edgeDetectionMaterial.setEdgeDetectionThreshold(0.05);
     SMAA.edgeDetectionMaterial.setPredicationMode(PredicationMode.DEPTH);
@@ -52,21 +52,23 @@ function usePostprocessing(reflectorPipeline = []) {
       blendFunction: BlendFunction.SKIP,
       texture: SMAA.renderTargetWeights.texture,
     });
+    // END ANTIALIAS
 
     const effectPass = new EffectPass(
       camera,
       SMAA,
       edgesTextureEffect,
       weightsTextureEffect,
+      BLOOM,
       NOISE
     );
-    const effectPass2 = new EffectPass(camera, CHROMATIC_ABERRATION);
+    const effectPassChroAbb = new EffectPass(camera, CHROMATIC_ABERRATION);
 
     reflectorPipeline.forEach((pass) => composer.addPass(pass));
 
     composer.addPass(renderPass);
     composer.addPass(effectPass);
-    composer.addPass(effectPass2);
+    composer.addPass(effectPassChroAbb);
 
     return [composer];
   }, [gl, scene, camera, reflectorPipeline, smaa]);

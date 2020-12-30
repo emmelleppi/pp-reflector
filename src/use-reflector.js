@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  Fog,
   LinearFilter,
   MathUtils,
   Matrix4,
@@ -21,8 +20,13 @@ import {
   DepthOfFieldEffect,
 } from "postprocessing";
 import { useResource, useThree } from "react-three-fiber";
+import { ReflectorMaterial } from "./reflector-material";
 
-export function useReflector({ textureWidth, textureHeight, clipBias }) {
+export function useReflector(
+  textureWidth = 512,
+  textureHeight = 512,
+  clipBias = 0
+) {
   const meshRef = useResource();
   const [reflectorPlane] = useState(() => new Plane());
   const [normal] = useState(() => new Vector3());
@@ -190,15 +194,11 @@ export function useReflector({ textureWidth, textureHeight, clipBias }) {
     }
 
     const renderPass = new RenderPass(scene, virtualCamera);
-    // const blurPass = new BlurPass();
-    // blurPass.width = 2000;
-    // blurPass.height = 2000;
-
     const depthPass = new DepthPass(scene, virtualCamera);
     const dof = new DepthOfFieldEffect(virtualCamera, {
-      focusDistance: 0.2,
-      focalLength: 1.0,
-      bokehScale: 4.0,
+      focusDistance: 0.3,
+      focalLength: 0.6,
+      bokehScale: 3.0,
     });
     const blurPass = new EffectPass(virtualCamera, dof);
     blurPass.setDepthTexture(depthPass.texture, RGBADepthPacking);
@@ -223,14 +223,21 @@ export function useReflector({ textureWidth, textureHeight, clipBias }) {
     renderer.outputEncoding,
   ]);
 
+  const Material = useMemo(
+    () => ReflectorMaterial({ savePass, textureMatrix }),
+    [savePass, textureMatrix]
+  );
+
   return [
     meshRef,
-    textureMatrix,
-    renderPass,
-    savePass,
-    lambdaPassBefore,
-    lambdaPassAfter,
-    blurPass,
-    depthPass,
+    Material,
+    [
+      lambdaPassBefore,
+      renderPass,
+      depthPass,
+      blurPass,
+      savePass,
+      lambdaPassAfter,
+    ],
   ];
 }
